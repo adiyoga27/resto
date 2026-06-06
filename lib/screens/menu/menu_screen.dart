@@ -8,6 +8,7 @@ import '../../providers/order_provider.dart';
 import '../../models/menu_item.dart';
 import '../../models/menu_category.dart';
 import '../../models/order.dart';
+import '../../services/media_service.dart';
 import '../../core/responsive/responsive_layout.dart';
 import '../../core/utils/currency_format.dart';
 import '../../core/utils/currency_formatter.dart';
@@ -144,7 +145,16 @@ class _MenuScreenState extends State<MenuScreen> {
                           imageQuality: 85,
                         );
                         if (file != null) {
-                          setDialogState(() => imageUrl = file.path);
+                          setDialogState(() => imageUrl = 'uploading');
+                          final result = await MediaService().upload(File(file.path));
+                          if (result.success && mounted) {
+                            setDialogState(() => imageUrl = result.url);
+                          } else if (mounted) {
+                            setDialogState(() => imageUrl = file.path);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Upload gagal, pakai lokal: ${result.error}')),
+                            );
+                          }
                         }
                       },
                       child: Container(
@@ -152,50 +162,34 @@ class _MenuScreenState extends State<MenuScreen> {
                         decoration: BoxDecoration(
                           color: Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.grey.shade300,
-                            width: 2,
-                            strokeAlign: BorderSide.strokeAlignInside,
-                          ),
-                          image: imageUrl.isNotEmpty
+                          border: Border.all(color: Colors.grey.shade300, width: 2, strokeAlign: BorderSide.strokeAlignInside),
+                          image: imageUrl.isNotEmpty && imageUrl != 'uploading' && !imageUrl.startsWith('upload')
                               ? DecorationImage(
-                                  image: FileImage(File(imageUrl)),
+                                  image: imageUrl.startsWith('http')
+                                      ? NetworkImage(imageUrl) as ImageProvider
+                                      : FileImage(File(imageUrl)),
                                   fit: BoxFit.cover,
                                 )
                               : null,
                         ),
-                        child: imageUrl.isEmpty
-                            ? Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.add_photo_alternate_outlined,
-                                      size: 48, color: Colors.grey.shade400),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Tap untuk upload gambar',
-                                    style: TextStyle(
-                                        color: Colors.grey.shade500,
-                                        fontSize: 13),
-                                  ),
-                                ],
-                              )
-                            : Stack(
-                                children: [
-                                  Positioned(
-                                    top: 8,
-                                    right: 8,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black54,
-                                        borderRadius: BorderRadius.circular(8),
+                        child: imageUrl == 'uploading'
+                            ? const Center(child: CircularProgressIndicator())
+                            : imageUrl.isEmpty
+                                ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                    Icon(Icons.add_photo_alternate_outlined, size: 48, color: Colors.grey.shade400),
+                                    const SizedBox(height: 8),
+                                    Text('Tap untuk upload gambar', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                                  ])
+                                : Stack(children: [
+                                    Positioned(
+                                      top: 8, right: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
+                                        child: const Icon(Icons.edit, color: Colors.white, size: 16),
                                       ),
-                                      child: const Icon(Icons.edit,
-                                          color: Colors.white, size: 16),
                                     ),
-                                  ),
-                                ],
-                              ),
+                                  ]),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -597,11 +591,9 @@ class _MenuItemCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   if (item.imageUrl.isNotEmpty)
-                    Image.file(
-                      File(item.imageUrl),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _defaultImage(),
-                    )
+                    item.imageUrl.startsWith('http')
+                        ? Image.network(item.imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultImage())
+                        : Image.file(File(item.imageUrl), fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultImage())
                   else
                     _defaultImage(),
                   if (!item.available)

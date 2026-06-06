@@ -868,7 +868,17 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pembayaran berhasil!'), behavior: SnackBarBehavior.floating),
       );
-      Navigator.pop(context);
+      setState(() {
+        _showPayment = false;
+        _createdOrderId = null;
+        _customerCtrl.clear();
+        _discountCtrl.text = '0';
+        _discountPercentCtrl.text = '0';
+        _orderType = OrderType.dineIn;
+        _selectedTable = null;
+        _bankCtrl.clear();
+        _cardNumberCtrl.clear();
+      });
     }
   }
 
@@ -929,8 +939,9 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               ), child: _buildSidePanel(prov, theme)),
             ])
           : Column(children: [
-              Expanded(child: _buildMenuPanel(menuProv, menuItems, theme)),
-              if (prov.cart.isNotEmpty) _buildBottomBar(prov, theme),
+              Expanded(flex: 3, child: _buildMenuPanel(menuProv, menuItems, theme)),
+              if (prov.cart.isNotEmpty)
+                _buildPortraitCart(prov, theme),
             ]),
     );
   }
@@ -1169,12 +1180,19 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: item.imageUrl.isNotEmpty
-                                ? Image.file(
-                                    File(item.imageUrl),
-                                    width: 48,
-                                    height: 48,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => _defaultAvatar(item, isDark),
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: item.imageUrl.startsWith('http')
+                                        ? Image.network(
+                                            item.imageUrl,
+                                            width: 48, height: 48, fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => _defaultAvatar(item, isDark),
+                                          )
+                                        : Image.file(
+                                            File(item.imageUrl),
+                                            width: 48, height: 48, fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => _defaultAvatar(item, isDark),
+                                          ),
                                   )
                                 : _defaultAvatar(item, isDark),
                           ),
@@ -1582,33 +1600,101 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     );
   }
 
-  Widget _buildBottomBar(OrderProvider prov, ThemeData theme) {
+  Widget _buildPortraitCart(OrderProvider prov, ThemeData theme) {
     String orderInfo = _orderType == OrderType.dineIn ? 'Makan di Tempat' : _orderType == OrderType.takeAway ? 'Bawa Pulang' : 'Antar';
     if (_selectedTable != null) orderInfo += ' • M${_selectedTable!.name}';
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.35),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, -4))],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: Row(children: [
-        Expanded(
-          child: Text('${prov.cartItemCount} item | $orderInfo',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-        ),
-        const SizedBox(width: 8),
-        FilledButton(
-          onPressed: _submitAndPay,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppTheme.successColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: theme.dividerColor)),
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.payment, size: 18),
-            const SizedBox(width: 6),
-            Text(formatCurrency(_cartTotal), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+          child: Row(children: [
+            Text('${prov.cartItemCount} item | $orderInfo',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            const Spacer(),
+            Text(formatCurrency(_cartTotal),
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: AppTheme.secondaryColor)),
+          ]),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            itemCount: prov.cart.length,
+            itemBuilder: (_, i) {
+              final item = prov.cart[i];
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(formatCurrency(item.price), style: TextStyle(fontSize: 11, color: theme.colorScheme.outline)),
+                    ]),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      InkWell(
+                        onTap: () => prov.updateCartItemQuantity(item.menuItemId, item.quantity - 1),
+                        borderRadius: BorderRadius.circular(6),
+                        child: const Padding(padding: EdgeInsets.all(6), child: Icon(Icons.remove, size: 16)),
+                      ),
+                      SizedBox(width: 24, child: Text('${item.quantity}', textAlign: TextAlign.center,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
+                      InkWell(
+                        onTap: () => prov.updateCartItemQuantity(item.menuItemId, item.quantity + 1),
+                        borderRadius: BorderRadius.circular(6),
+                        child: const Padding(padding: EdgeInsets.all(6), child: Icon(Icons.add, size: 16)),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(formatCurrency(item.subtotal), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                ]),
+              );
+            },
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLow,
+            border: Border(top: BorderSide(color: theme.dividerColor)),
+          ),
+          child: Row(children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Total: ${formatCurrency(_cartTotal)}',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              if (_discountAmount > 0)
+                Text('Diskon: -${formatCurrency(_discountAmount)}',
+                    style: const TextStyle(fontSize: 11, color: Colors.red)),
+            ]),
+            const Spacer(),
+            SizedBox(
+              height: 42,
+              child: FilledButton.icon(
+                onPressed: _submitAndPay,
+                icon: const Icon(Icons.payment, size: 18),
+                label: const Text('Bayar'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.successColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+              ),
+            ),
           ]),
         ),
       ]),
