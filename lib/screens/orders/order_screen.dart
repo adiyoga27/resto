@@ -1668,33 +1668,74 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
           ),
         ),
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerLow,
             border: Border(top: BorderSide(color: theme.dividerColor)),
           ),
-          child: Row(children: [
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Total: ${formatCurrency(_cartTotal)}',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-              if (_discountAmount > 0)
-                Text('Diskon: -${formatCurrency(_discountAmount)}',
-                    style: const TextStyle(fontSize: 11, color: Colors.red)),
+          child: Column(children: [
+            Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _totalRow('Subtotal', _cartSubtotal, theme),
+                  _totalRow('Pajak (${(_taxRate * 100).toStringAsFixed(0)}%)', _cartTax, theme),
+                  _totalRow('Service (${(_serviceCharge * 100).toStringAsFixed(0)}%)', _cartService, theme),
+                ]),
+              ),
+              const SizedBox(width: 8),
             ]),
-            const Spacer(),
-            SizedBox(
-              height: 42,
-              child: FilledButton.icon(
-                onPressed: _submitAndPay,
-                icon: const Icon(Icons.payment, size: 18),
-                label: const Text('Bayar'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.successColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            Row(children: [
+              Expanded(
+                child: _useDiscountPercent
+                    ? TextField(
+                        controller: _discountPercentCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                            labelText: 'Diskon %', suffixText: '%',
+                            border: OutlineInputBorder(), isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                      )
+                    : TextField(
+                        controller: _discountCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                            labelText: 'Diskon Rp', prefixText: 'Rp',
+                            border: OutlineInputBorder(), isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                      ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: Icon(_useDiscountPercent ? Icons.percent : Icons.monetization_on_outlined, size: 18),
+                onPressed: () => setState(() => _useDiscountPercent = !_useDiscountPercent),
+                padding: EdgeInsets.zero, constraints: const BoxConstraints(),
+              ),
+            ]),
+            if (_discountAmount > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text('Diskon: -${formatCurrency(_discountAmount)}',
+                    style: const TextStyle(fontSize: 11, color: Colors.red)),
+              ),
+            const SizedBox(height: 8),
+            Row(children: [
+              Text('Total: ${formatCurrency(_cartTotal)}',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+              const Spacer(),
+              SizedBox(
+                height: 40,
+                child: FilledButton.icon(
+                  onPressed: _submitAndPay,
+                  icon: const Icon(Icons.payment, size: 18),
+                  label: const Text('Bayar'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.successColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
                 ),
               ),
-            ),
+            ]),
           ]),
         ),
       ]),
