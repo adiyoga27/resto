@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "862865865411",
+    "project_id": "resto-e9508",
+    "storage_bucket": "resto-e9508.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:862865865411:android:a9b81ee01884b25782c076",
+        "android_client_info": {
+          "package_name": "com.codingaja.resto"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdL6saBKx2XSlXhVkZ-MW2s6UP2Uy5BBI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
