@@ -10,6 +10,7 @@ import '../../models/menu_category.dart';
 import '../../models/order.dart';
 import '../../core/responsive/responsive_layout.dart';
 import '../../core/utils/currency_format.dart';
+import '../../core/utils/currency_formatter.dart';
 import '../../config/theme.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -212,6 +213,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       controller: priceCtrl,
                       style: const TextStyle(fontSize: 15),
                       keyboardType: TextInputType.number,
+                      inputFormatters: [CurrencyInputFormatter()],
                       decoration: InputDecoration(
                         labelText: 'Harga',
                         prefixText: 'Rp ',
@@ -267,7 +269,7 @@ class _MenuScreenState extends State<MenuScreen> {
                               name: nameCtrl.text.trim(),
                               categoryId: selectedCategoryId,
                               categoryName: cat?.name ?? '',
-                              price: double.tryParse(priceCtrl.text) ?? 0,
+                              price: double.tryParse(priceCtrl.text.replaceAll('.', '')) ?? 0,
                               description: descCtrl.text.trim(),
                               imageUrl: imageUrl,
                             ));
@@ -320,131 +322,150 @@ class _MenuScreenState extends State<MenuScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.menu),
+        title: Text(l10n.menu, style: const TextStyle(fontWeight: FontWeight.w800)),
         actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
             child: FilledButton.icon(
               onPressed: () => _showAddItemDialog(),
-              icon: const Icon(Icons.add, size: 20),
-              label: const Text('Tambah'),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(l10n.addItem, style: const TextStyle(fontWeight: FontWeight.bold)),
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.white.withAlpha(30),
-                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ),
         ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: TextField(
-              controller: _searchCtrl,
-              decoration: InputDecoration(
-                hintText: '${l10n.search} menu...',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerHighest
-                    .withAlpha(80),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              onChanged: (v) => setState(() => _searchQuery = v),
-            ),
-          ),
-          SizedBox(
-            height: 42,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _CategoryChip(
-                  label: 'Semua',
-                  isSelected: prov.selectedCategoryId.isEmpty ||
-                      prov.selectedCategoryId == 'all',
-                  onTap: () => prov.setSelectedCategory('all'),
-                ),
-                ...prov.categories.map((cat) => _CategoryChip(
-                      label: cat.name,
-                      isSelected: prov.selectedCategoryId == cat.id,
-                      onTap: () => prov.setSelectedCategory(cat.id),
-                      onEdit: () => _showEditCategoryDialog(cat),
-                      onDelete: () => _confirmDeleteCategory(cat),
-                    )),
-                const SizedBox(width: 4),
-                _CategoryChip(
-                  label: '+ ${l10n.add}',
-                  isSelected: false,
-                  isAdd: true,
-                  onTap: _showAddCategoryDialog,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: items.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.restaurant_menu_outlined,
-                            size: 64, color: Colors.grey.shade300),
-                        const SizedBox(height: 12),
-                        Text(l10n.noData,
-                            style: TextStyle(color: Colors.grey.shade500)),
-                      ],
-                    ),
-                  )
-                : GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: responsive.crossAxisCount,
-                      mainAxisSpacing: 14,
-                      crossAxisSpacing: 14,
-                      childAspectRatio: responsive.isTablet ? 0.85 : 0.8,
-                    ),
-                    itemCount: items.length,
-                    itemBuilder: (_, i) => _MenuItemCard(
-                      item: items[i],
-                      onTap: () => _showAddItemDialog(existing: items[i]),
-                      onDelete: () => _confirmDeleteItem(items[i]),
-                      onAddToCart: () {
-                        context.read<OrderProvider>().addToCart(OrderItem(
-                              menuItemId: items[i].id,
-                              name: items[i].name,
-                              price: items[i].price,
-                            ));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${items[i].name} ditambahkan'),
-                            duration: const Duration(seconds: 1),
-                            behavior: SnackBarBehavior.floating,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(116),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: TextField(
+                          controller: _searchCtrl,
+                          decoration: InputDecoration(
+                            hintText: '${l10n.search} menu...',
+                            prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear_rounded, size: 18),
+                                    onPressed: () {
+                                      _searchCtrl.clear();
+                                      setState(() => _searchQuery = '');
+                                    },
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(80),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                           ),
-                        );
-                      },
+                          onChanged: (v) => setState(() => _searchQuery = v),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Tooltip(
+                      message: l10n.addCategory,
+                      child: Material(
+                        color: Theme.of(context).colorScheme.primary.withAlpha(25),
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          onTap: _showAddCategoryDialog,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            height: 44,
+                            width: 44,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Theme.of(context).colorScheme.primary.withAlpha(50)),
+                            ),
+                            child: Icon(Icons.create_new_folder_outlined, color: Theme.of(context).colorScheme.primary, size: 22),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 38,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    _CategoryChip(
+                      label: 'Semua',
+                      isSelected: prov.selectedCategoryId.isEmpty || prov.selectedCategoryId == 'all',
+                      onTap: () => prov.setSelectedCategory('all'),
+                    ),
+                    ...prov.categories.map((cat) => _CategoryChip(
+                          label: cat.name,
+                          isSelected: prov.selectedCategoryId == cat.id,
+                          onTap: () => prov.setSelectedCategory(cat.id),
+                          onEdit: () => _showEditCategoryDialog(cat),
+                          onDelete: () => _confirmDeleteCategory(cat),
+                        )),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
           ),
-        ],
+        ),
       ),
+      body: items.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.restaurant_menu_outlined,
+                      size: 64, color: Colors.grey.shade300),
+                  const SizedBox(height: 12),
+                  Text(l10n.noData,
+                      style: TextStyle(color: Colors.grey.shade500)),
+                ],
+              ),
+            )
+          : GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: responsive.crossAxisCount,
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 14,
+                childAspectRatio: responsive.isTablet ? 0.85 : 0.8,
+              ),
+              itemCount: items.length,
+              itemBuilder: (_, i) => _MenuItemCard(
+                item: items[i],
+                onTap: () => _showAddItemDialog(existing: items[i]),
+                onDelete: () => _confirmDeleteItem(items[i]),
+                onAddToCart: () {
+                  context.read<OrderProvider>().addToCart(OrderItem(
+                        menuItemId: items[i].id,
+                        name: items[i].name,
+                        price: items[i].price,
+                      ));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${items[i].name} ditambahkan'),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              ),
+            ),
     );
   }
 
@@ -501,7 +522,6 @@ class _CategoryChip extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
-  final bool isAdd;
 
   const _CategoryChip({
     required this.label,
@@ -509,57 +529,35 @@ class _CategoryChip extends StatelessWidget {
     required this.onTap,
     this.onEdit,
     this.onDelete,
-    this.isAdd = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Material(
         color: isSelected
-            ? AppTheme.secondaryColor
-            : isAdd
-                ? Colors.transparent
-                : Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
+            ? theme.colorScheme.primary
+            : isDark ? Colors.white10 : Colors.black.withAlpha(10),
+        borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: onTap,
           onLongPress: onEdit != null ? onEdit : null,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              border: isAdd
-                  ? Border.all(
-                      color: AppTheme.secondaryColor.withAlpha(100),
-                      width: 1.5,
-                      strokeAlign: BorderSide.strokeAlignInside,
-                    )
-                  : null,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isAdd)
-                  Icon(Icons.add,
-                      size: 16,
-                      color: isSelected ? Colors.white : AppTheme.secondaryColor),
-                if (isAdd) const SizedBox(width: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected
-                        ? Colors.white
-                        : isAdd
-                            ? AppTheme.secondaryColor
-                            : null,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface.withAlpha(200),
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: 13,
                 ),
-              ],
+              ),
             ),
           ),
         ),

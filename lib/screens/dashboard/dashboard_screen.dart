@@ -106,7 +106,7 @@ class DashboardScreen extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         )),
                     const SizedBox(height: 4),
-                    Text('${l10n.todaySales} • $todayRevenue',
+                    Text('${l10n.todaySales} • ${formatCurrency(todayRevenue)}',
                         style: const TextStyle(
                             color: Colors.white70, fontSize: 13)),
                   ],

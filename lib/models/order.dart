@@ -82,14 +82,16 @@ class OrderModel {
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
+  double _round(double value) => (value * 100).roundToDouble() / 100;
+
   double get subtotal =>
-      items.fold(0, (sum, item) => sum + item.subtotal);
+      _round(items.fold(0.0, (sum, item) => sum + item.subtotal));
 
-  double get taxAmount => subtotal * taxRate;
+  double get taxAmount => _round(subtotal * taxRate);
 
-  double get serviceAmount => subtotal * serviceCharge;
+  double get serviceAmount => _round(subtotal * serviceCharge);
 
-  double get total => subtotal + taxAmount + serviceAmount - discount;
+  double get total => _round(subtotal + taxAmount + serviceAmount - discount);
 
   double get change => amountPaid - total;
 

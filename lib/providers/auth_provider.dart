@@ -14,6 +14,7 @@ class AuthProvider extends ChangeNotifier {
   String get restaurantName => _authService.restaurantName;
   String get restaurantId => _authService.restaurantId;
   bool get isSuperAdmin => _authService.isSuperAdmin;
+  bool get isKitchen => role == 'kitchen';
   String get role => _authService.role;
 
   Future<void> init() async {

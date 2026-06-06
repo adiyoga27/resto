@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:provider/provider.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../providers/order_provider.dart';
@@ -9,6 +11,7 @@ import '../../models/menu_item.dart';
 import '../../models/table.dart';
 import '../../core/responsive/responsive_layout.dart';
 import '../../core/utils/currency_format.dart';
+import '../../core/utils/currency_formatter.dart';
 import '../../config/theme.dart';
 import '../../services/print_service.dart';
 import '../../widgets/common/receipt_dialog.dart';
@@ -23,6 +26,15 @@ class OrderScreen extends StatefulWidget {
 
 class _OrderScreenState extends State<OrderScreen> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthProvider>();
+      if (auth.isKitchen) {
+        context.read<OrderProvider>().setStatusFilter('active');
+      }
+    });
+  }
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final prov = context.watch<OrderProvider>();
@@ -33,15 +45,20 @@ class _OrderScreenState extends State<OrderScreen> {
       appBar: AppBar(
         title: Text(l10n.orders),
         actions: [
-          FilledButton.icon(
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const CreateOrderScreen())),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('POS'),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.white.withAlpha(30),
-              foregroundColor: Colors.white,
-            ),
+          Consumer<AuthProvider>(
+            builder: (_, auth, __) {
+              if (auth.isKitchen) return const SizedBox.shrink();
+              return FilledButton.icon(
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const CreateOrderScreen())),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('POS'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white.withAlpha(30),
+                  foregroundColor: Colors.white,
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -72,15 +89,23 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 
   Widget _buildStatusFilter(OrderProvider prov, ThemeData theme) {
-    final filters = {
-      'all': 'Semua',
-      'active': 'Aktif',
-      'pending': 'Menunggu',
-      'preparing': 'Disiapkan',
-      'ready': 'Siap',
-      'completed': 'Selesai',
-      'cancelled': 'Dibatalkan',
-    };
+    final auth = context.watch<AuthProvider>();
+    final filters = auth.isKitchen
+        ? {
+            'pending': 'Menunggu',
+            'preparing': 'Disiapkan',
+            'ready': 'Siap',
+            'served': 'Disajikan',
+          }
+        : {
+            'all': 'Semua',
+            'active': 'Aktif',
+            'pending': 'Menunggu',
+            'preparing': 'Disiapkan',
+            'ready': 'Siap',
+            'completed': 'Selesai',
+            'cancelled': 'Dibatalkan',
+          };
     return Container(
       height: 44,
       margin: const EdgeInsets.only(top: 8),
@@ -338,6 +363,20 @@ class _OrderCardState extends State<_OrderCard> {
       }
     }
 
+    if (order.status == OrderStatus.pending) {
+      buttons.add(OutlinedButton.icon(
+        onPressed: () => _showEditOrderDialog(context, order),
+        icon: const Icon(Icons.edit, size: 16),
+        label: const Text('Edit', style: TextStyle(fontSize: 11)),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.blue,
+          side: const BorderSide(color: Colors.blue),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ));
+    }
+
     if (order.status != OrderStatus.completed && order.status != OrderStatus.cancelled) {
       buttons.add(TextButton.icon(
         onPressed: () async {
@@ -369,6 +408,103 @@ class _OrderCardState extends State<_OrderCard> {
     }
 
     return buttons;
+  }
+
+  void _showEditOrderDialog(BuildContext context, OrderModel order) {
+    final prov = context.read<OrderProvider>();
+    final nameCtrl = TextEditingController(text: order.customerName);
+    final items = List<OrderItem>.from(order.items.map((e) => OrderItem(
+      menuItemId: e.menuItemId, name: e.name, price: e.price, quantity: e.quantity, notes: e.notes,
+    )));
+
+    showDialog(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 450),
+              padding: const EdgeInsets.all(20),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  const Text('Edit Pesanan', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                  const Spacer(),
+                  IconButton(onPressed: () => Navigator.pop(c), icon: const Icon(Icons.close)),
+                ]),
+                const SizedBox(height: 4),
+                Text('#${order.orderNumber}', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Nama Pelanggan', border: OutlineInputBorder(), isDense: true),
+                ),
+                const SizedBox(height: 14),
+                const Text('Item Pesanan', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                ...List.generate(items.length, (i) {
+                  final item = items[i];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(children: [
+                      Expanded(
+                        child: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                      ),
+                      SizedBox(
+                        width: 100,
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline, size: 20, color: Colors.red),
+                            onPressed: () {
+                              setDialogState(() {
+                                if (item.quantity > 1) {
+                                  item.quantity--;
+                                } else {
+                                  items.removeAt(i);
+                                }
+                              });
+                            },
+                          ),
+                          Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline, size: 20, color: Colors.green),
+                            onPressed: () => setDialogState(() => item.quantity++),
+                          ),
+                        ]),
+                      ),
+                      Text(formatCurrency(item.subtotal), style: const TextStyle(fontSize: 12)),
+                    ]),
+                  );
+                }),
+                const Divider(height: 20),
+                Text('Total: ${formatCurrency(items.fold<double>(0, (s, i) => s + i.subtotal))}',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                const SizedBox(height: 16),
+                Row(children: [
+                  Expanded(
+                    child: OutlinedButton(onPressed: () => Navigator.pop(c), child: const Text('Batal')),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () async {
+                        final updated = order.copyWith(
+                          customerName: nameCtrl.text.trim(),
+                          items: items,
+                        );
+                        await prov.updateOrder(updated);
+                        Navigator.pop(c);
+                      },
+                      child: const Text('Simpan'),
+                    ),
+                  ),
+                ]),
+              ]),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _showPaymentDialog(BuildContext context, OrderModel order) {
@@ -456,9 +592,15 @@ class _OrderCardState extends State<_OrderCard> {
                 await prov.processPayment(order.id, method, actualPaid);
                 Navigator.pop(c);
                 if (!context.mounted) return;
+                final auth = context.read<AuthProvider>();
+                final resto = context.read<RestaurantProvider>();
 
                 final result = await ReceiptPreview.show(context,
-                  order: order, restaurantName: context.read<AuthProvider>().restaurantName);
+                  order: order,
+                  restaurantName: auth.restaurantName,
+                  restaurantAddress: resto.settings.address,
+                  cashierName: auth.userName,
+                );
                 if (result == PrintResult.print && context.mounted) {
                   await _handlePrint(context, order);
                 }
@@ -478,16 +620,59 @@ class _OrderCardState extends State<_OrderCard> {
 
   Future<void> _handlePrint(BuildContext context, OrderModel order) async {
     final auth = context.read<AuthProvider>();
+    final resto = context.read<RestaurantProvider>();
+    resto.load(auth.restaurantId);
+    await Future.delayed(const Duration(milliseconds: 300));
+    final printers = resto.settings.printers;
+
+    if (printers.isEmpty) {
+      final pick = await PrinterPicker.show(context);
+      if (pick == null) return;
+      await _printSingle(context, order, auth, resto, pick);
+      return;
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Mencetak ke ${printers.length} printer...')),
+      );
+    }
+
+    for (final p in printers) {
+      try {
+        final device = BluetoothDevice(remoteId: p['address']! as DeviceIdentifier);
+        final printService = PrintService();
+        final ok = await printService.connectToDevice(device);
+        if (ok) {
+          await printService.printReceipt(order,
+            restaurantName: auth.restaurantName,
+            restaurantAddress: resto.settings.address,
+            cashierName: auth.userName,
+          );
+          await printService.disconnect();
+        }
+      } catch (_) {}
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cetak selesai')),
+      );
+    }
+  }
+
+  Future<void> _printSingle(BuildContext context, OrderModel order, AuthProvider auth, RestaurantProvider resto, BluetoothDevice device) async {
     final printService = PrintService();
-    final device = await PrinterPicker.show(context);
-    if (device == null) return;
     final connected = await printService.connectToDevice(device);
     if (!connected) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal konek ke printer')));
       return;
     }
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mencetak...')));
-    final ok = await printService.printReceipt(order, auth.restaurantName);
+    final ok = await printService.printReceipt(order,
+      restaurantName: auth.restaurantName,
+      restaurantAddress: resto.settings.address,
+      cashierName: auth.userName);
     await printService.disconnect();
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -515,7 +700,10 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   bool _showPayment = false;
   PaymentMethod _paymentMethod = PaymentMethod.cash;
   final _amountPaidCtrl = TextEditingController();
+  final _bankCtrl = TextEditingController();
+  final _cardNumberCtrl = TextEditingController();
   String? _createdOrderId;
+  double _finalTotal = 0;
 
   @override
   void initState() {
@@ -538,6 +726,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   void dispose() {
     _searchCtrl.dispose(); _customerCtrl.dispose();
     _discountCtrl.dispose(); _discountPercentCtrl.dispose(); _amountPaidCtrl.dispose();
+    _bankCtrl.dispose(); _cardNumberCtrl.dispose();
     super.dispose();
   }
 
@@ -549,12 +738,13 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     }
     return double.tryParse(_discountCtrl.text) ?? 0;
   }
-  double get _cartSubtotal => context.read<OrderProvider>().cart.fold(0, (s, i) => s + i.subtotal);
-  double get _cartTax => _cartSubtotal * _taxRate;
-  double get _cartService => _cartSubtotal * _serviceCharge;
-  double get _cartTotal => _cartSubtotal + _cartTax + _cartService - _discountAmount;
-  double get _amountPaid => double.tryParse(_amountPaidCtrl.text) ?? _cartTotal;
-  double get _change => _amountPaid - _cartTotal;
+  double get _cartSubtotal => _round(context.read<OrderProvider>().cart.fold(0.0, (s, i) => s + i.subtotal));
+  double get _cartTax => _round(_cartSubtotal * _taxRate);
+  double get _cartService => _round(_cartSubtotal * _serviceCharge);
+  double get _cartTotal => _round(_cartSubtotal + _cartTax + _cartService - _discountAmount);
+
+  double _round(double v) => (v * 100).roundToDouble() / 100;
+  double get _amountPaid => double.tryParse(_amountPaidCtrl.text.replaceAll('.', '')) ?? _finalTotal;
 
   Future<void> _submitAndPay() async {
     final customerName = _customerCtrl.text.trim();
@@ -571,6 +761,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       return;
     }
 
+    final total = _cartTotal;
+
     final prov = context.read<OrderProvider>();
     prov.setOrderType(_orderType);
     prov.setCustomerName(customerName);
@@ -582,42 +774,97 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
     final id = await prov.submitOrder(taxRate: _taxRate, discount: _discountAmount, serviceCharge: _serviceCharge);
     _createdOrderId = id;
-    _amountPaidCtrl.text = _cartTotal.toStringAsFixed(0);
+    _finalTotal = total;
+    _amountPaidCtrl.text = total.toStringAsFixed(0);
     setState(() => _showPayment = true);
   }
 
   Future<void> _confirmPayment() async {
     if (_createdOrderId == null) return;
-    if (_paymentMethod == PaymentMethod.cash && _amountPaid < _cartTotal) {
+
+    if (_paymentMethod == PaymentMethod.card) {
+      if (_bankCtrl.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nama bank wajib diisi!'), behavior: SnackBarBehavior.floating),
+        );
+        return;
+      }
+      if (_cardNumberCtrl.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nomor kartu wajib diisi!'), behavior: SnackBarBehavior.floating),
+        );
+        return;
+      }
+    }
+
+    if (_paymentMethod == PaymentMethod.cash && (_amountPaid + 0.001) < _finalTotal) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Jumlah pembayaran kurang'), behavior: SnackBarBehavior.floating),
       );
       return;
     }
     final prov = context.read<OrderProvider>();
-    await prov.processPayment(_createdOrderId!, _paymentMethod, _amountPaid);
+    await prov.processPayment(_createdOrderId!, _paymentMethod, _paymentMethod == PaymentMethod.cash ? _amountPaid : _finalTotal);
 
     if (!mounted) return;
     final auth = context.read<AuthProvider>();
+    final resto = context.read<RestaurantProvider>();
     final order = prov.orders.firstWhere((o) => o.id == _createdOrderId,
         orElse: () => OrderModel(id: '', orderNumber: '', items: []));
 
     final result = await ReceiptPreview.show(context,
-      order: order, restaurantName: auth.restaurantName);
+      order: order,
+      restaurantName: auth.restaurantName,
+      restaurantAddress: resto.settings.address,
+      cashierName: auth.userName,
+    );
 
     if (result == PrintResult.print && mounted) {
-      final printService = PrintService();
-      final device = await PrinterPicker.show(context);
-      if (device != null) {
-        final ok = await printService.connectToDevice(device);
-        if (ok) {
-          await printService.printReceipt(order, auth.restaurantName);
-          await printService.disconnect();
+      resto.load(auth.restaurantId);
+      await Future.delayed(const Duration(milliseconds: 300));
+      final printers = resto.settings.printers;
+
+      if (printers.isEmpty) {
+        final pick = await PrinterPicker.show(context);
+        if (pick != null) {
+          final ps = PrintService();
+          if (await ps.connectToDevice(pick)) {
+            await ps.printReceipt(order,
+              restaurantName: auth.restaurantName,
+              restaurantAddress: resto.settings.address,
+              cashierName: auth.userName,
+            );
+            await ps.disconnect();
+          }
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Mencetak ke ${printers.length} printer...')),
+        );
+        for (final p in printers) {
+          try {
+            final device = BluetoothDevice(remoteId: p['address']! as DeviceIdentifier);
+            final ps = PrintService();
+            if (await ps.connectToDevice(device)) {
+              await ps.printReceipt(order,
+                restaurantName: auth.restaurantName,
+                restaurantAddress: resto.settings.address,
+                cashierName: auth.userName,
+              );
+              await ps.disconnect();
+            }
+          } catch (_) {}
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cetak selesai')),
+          );
         }
       }
     }
 
     if (mounted) {
+      prov.clearCart();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pembayaran berhasil!'), behavior: SnackBarBehavior.floating),
       );
@@ -701,7 +948,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               const SizedBox(height: 12),
               Text('Total Pembayaran', style: TextStyle(color: theme.colorScheme.outline, fontSize: 14)),
               const SizedBox(height: 4),
-              Text(formatCurrency(_cartTotal), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
+              Text(formatCurrency(_finalTotal), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
             ]),
           ),
         ),
@@ -735,13 +982,14 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                 TextField(
                   controller: _amountPaidCtrl,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [CurrencyInputFormatter()],
                   decoration: const InputDecoration(
                     labelText: 'Jumlah Dibayar', prefixText: 'Rp ',
                     border: OutlineInputBorder(), isDense: true,
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
-                if (_change > 0) ...[
+                if (_amountPaid - _finalTotal > 0) ...[
                   const SizedBox(height: 10),
                   Container(
                     padding: const EdgeInsets.all(14),
@@ -752,11 +1000,54 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                     child: Row(children: [
                       const Icon(Icons.money, color: Colors.green),
                       const SizedBox(width: 8),
-                      Text('Kembalian: ${formatCurrency(_change)}',
+                      Text('Kembalian: ${formatCurrency(_amountPaid - _finalTotal)}',
                           style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w700, fontSize: 16)),
                     ]),
                   ),
                 ],
+              ],
+              if (_paymentMethod == PaymentMethod.card) ...[
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _bankCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nama Bank',
+                    prefixIcon: Icon(Icons.account_balance),
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _cardNumberCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Nomor Kartu',
+                    prefixIcon: Icon(Icons.credit_card),
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    hintText: '1234 5678 9012',
+                  ),
+                ),
+              ],
+              if (_paymentMethod == PaymentMethod.qris) ...[
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(children: [
+                    Icon(Icons.qr_code, size: 100, color: theme.colorScheme.onSurface),
+                    const SizedBox(height: 12),
+                    Text('Scan QRIS untuk membayar',
+                        style: TextStyle(color: theme.colorScheme.outline)),
+                    const SizedBox(height: 4),
+                    Text(formatCurrency(_finalTotal),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+                  ]),
+                ),
               ],
             ]),
           ),
@@ -767,7 +1058,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
           child: FilledButton.icon(
             onPressed: _confirmPayment,
             icon: const Icon(Icons.check_circle_outline),
-            label: Text('Konfirmasi Pembayaran ${formatCurrency(_cartTotal)}'),
+            label: Text('Konfirmasi Pembayaran ${formatCurrency(_finalTotal)}'),
             style: FilledButton.styleFrom(
               backgroundColor: AppTheme.successColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -785,19 +1076,54 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     return Column(children: [
       _buildOrderInfoBar(theme),
       Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
         child: TextField(
           controller: _searchCtrl,
+          style: const TextStyle(fontSize: 14),
           decoration: InputDecoration(
-            hintText: 'Cari menu...', prefixIcon: const Icon(Icons.search_rounded, size: 22),
-            filled: true, fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            hintText: 'Cari menu...',
+            prefixIcon: const Icon(Icons.search_rounded, size: 22),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear_rounded, size: 20),
+                    onPressed: () { _searchCtrl.clear(); setState(() => _searchQuery = ''); },
+                  )
+                : null,
+            filled: true,
+            fillColor: theme.colorScheme.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: theme.dividerColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: theme.dividerColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: AppTheme.secondaryColor, width: 1.5),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
           onChanged: (v) => setState(() => _searchQuery = v),
         ),
       ),
-      _buildCategoryChips(menuProv, theme),
+      Container(
+        height: 40,
+        margin: const EdgeInsets.only(bottom: 6),
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          children: [
+            _catChip('Semua', menuProv.selectedCategoryId.isEmpty || menuProv.selectedCategoryId == 'all',
+                () => menuProv.setSelectedCategory('all'), theme),
+            ...menuProv.categories.map((cat) {
+              final sel = menuProv.selectedCategoryId == cat.id;
+              return _catChip(cat.name, sel, () => menuProv.setSelectedCategory(cat.id), theme);
+            }),
+          ],
+        ),
+      ),
       Expanded(
         child: items.isEmpty
             ? Center(
@@ -808,42 +1134,86 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                 ]),
               )
             : GridView.builder(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: ResponsiveLayout(context).crossAxisCount,
-                  mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 2.4,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: ResponsiveLayout(context).isMobile ? 3.0 : 2.6,
                 ),
                 itemCount: items.length,
                 itemBuilder: (_, i) {
                   final item = items[i];
-                  return Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  final isDark = theme.brightness == Brightness.dark;
+
+                  return Material(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    elevation: 0,
                     child: InkWell(
                       onTap: item.available
                           ? () => context.read<OrderProvider>().addToCart(OrderItem(
                                 menuItemId: item.id, name: item.name, price: item.price))
                           : null,
                       borderRadius: BorderRadius.circular(14),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: theme.dividerColor,
+                            width: 0.5,
+                          ),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         child: Row(children: [
-                          Container(
-                            width: 44, height: 44,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: AppTheme.secondaryColor.withAlpha(18),
-                            ),
-                            child: const Icon(Icons.fastfood, color: AppTheme.secondaryColor, size: 22),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: item.imageUrl.isNotEmpty
+                                ? Image.file(
+                                    File(item.imageUrl),
+                                    width: 48,
+                                    height: 48,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => _defaultAvatar(item, isDark),
+                                  )
+                                : _defaultAvatar(item, isDark),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 14),
                           Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                              Text(item.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
-                              Text(formatCurrency(item.price), style: const TextStyle(color: AppTheme.secondaryColor, fontWeight: FontWeight.w600, fontSize: 13)),
-                            ]),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(item.name,
+                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 3),
+                                Text(formatCurrency(item.price),
+                                    style: const TextStyle(
+                                        color: AppTheme.secondaryColor,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14)),
+                              ],
+                            ),
                           ),
-                          if (!item.available) const Icon(Icons.block, color: Colors.red, size: 18),
+                          if (!item.available)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withAlpha(20),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text('Habis', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.w600)),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppTheme.secondaryColor.withAlpha(isDark ? 30 : 20),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.add, color: AppTheme.secondaryColor, size: 20),
+                            ),
                         ]),
                       ),
                     ),
@@ -854,34 +1224,58 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     ]);
   }
 
-  Widget _buildCategoryChips(MenuProvider menuProv, ThemeData theme) {
+  SizedBox _defaultAvatar(MenuItem item, bool isDark) {
     return SizedBox(
-      height: 38,
-      child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 14), children: [
-        _catChip('Semua', menuProv.selectedCategoryId.isEmpty || menuProv.selectedCategoryId == 'all',
-            () => menuProv.setSelectedCategory('all'), theme),
-        ...menuProv.categories.map((cat) {
-          final sel = menuProv.selectedCategoryId == cat.id;
-          return _catChip(cat.name, sel, () => menuProv.setSelectedCategory(cat.id), theme);
-        }),
-      ]),
+      width: 48, height: 48,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppTheme.secondaryColor.withAlpha(isDark ? 40 : 25),
+              AppTheme.accentColor.withAlpha(isDark ? 30 : 15),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Text(
+            item.name.isNotEmpty ? item.name[0].toUpperCase() : 'M',
+            style: TextStyle(
+              color: AppTheme.secondaryColor,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   Widget _catChip(String label, bool selected, VoidCallback onTap, ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: Material(
-        color: selected ? AppTheme.primaryColor : theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap, borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            child: Text(label, style: TextStyle(
-              color: selected ? Colors.white : theme.colorScheme.onSurface,
-              fontSize: 12, fontWeight: FontWeight.w600,
-            )),
+      padding: const EdgeInsets.only(right: 8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        child: Material(
+          color: selected
+              ? AppTheme.secondaryColor
+              : (isDark ? Colors.white12 : Colors.grey.shade100),
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(label,
+                  style: TextStyle(
+                    color: selected ? Colors.white : theme.colorScheme.onSurface,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  )),
+            ),
           ),
         ),
       ),
@@ -934,11 +1328,16 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   Widget _typeChip(String label, IconData icon, OrderType type, ThemeData theme) {
     final selected = _orderType == type;
     return ChoiceChip(
-      avatar: Icon(icon, size: 18, color: selected ? Colors.white : AppTheme.primaryColor),
+      avatar: Icon(icon, size: 18, color: selected ? Colors.white : AppTheme.secondaryColor),
       label: Text(label, style: const TextStyle(fontSize: 12)),
       selected: selected,
-      selectedColor: AppTheme.primaryColor,
-      labelStyle: TextStyle(color: selected ? Colors.white : null, fontWeight: selected ? FontWeight.w600 : FontWeight.normal),
+      selectedColor: AppTheme.secondaryColor,
+      backgroundColor: theme.colorScheme.surfaceContainerHighest,
+      labelStyle: TextStyle(
+          color: selected ? Colors.white : null,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.normal),
+      side: selected ? BorderSide.none : BorderSide(color: theme.dividerColor),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       onSelected: (_) {
         setState(() { _orderType = type; if (type != OrderType.dineIn) _selectedTable = null; });
         if (type == OrderType.dineIn) {
@@ -950,29 +1349,88 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
   void _showTablePicker() {
     final availableTables = _tables.where((t) => t.status == TableStatus.available).toList();
+    final theme = Theme.of(context);
+
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (c) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Pilih Meja', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 12),
-          if (availableTables.isEmpty)
-            Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('Tidak ada meja tersedia', style: TextStyle(color: Colors.grey.shade500))))
-          else
-            Wrap(spacing: 10, runSpacing: 10, children: availableTables.map((t) {
-              final sel = _selectedTable?.id == t.id;
-              return ChoiceChip(
-                label: Text('${t.name} (${t.capacity} org)'),
-                selected: sel, selectedColor: AppTheme.successColor,
-                labelStyle: TextStyle(color: sel ? Colors.white : null, fontWeight: sel ? FontWeight.w600 : FontWeight.normal),
-                onSelected: (_) { setState(() => _selectedTable = t); Navigator.pop(c); },
-              );
-            }).toList()),
-          const SizedBox(height: 12),
-          TextButton(onPressed: () { setState(() => _selectedTable = null); Navigator.pop(c); }, child: const Text('Tanpa Meja')),
-        ]),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (c) => DraggableScrollableSheet(
+        initialChildSize: 0.45,
+        minChildSize: 0.25,
+        maxChildSize: 0.75,
+        expand: false,
+        builder: (context, scrollCtrl) {
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.successColor.withAlpha(20),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.table_bar, color: AppTheme.successColor),
+                ),
+                const SizedBox(width: 12),
+                const Text('Pilih Meja', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                const Spacer(),
+                TextButton(onPressed: () { setState(() => _selectedTable = null); Navigator.pop(c); },
+                    child: const Text('Tanpa Meja')),
+              ]),
+              const SizedBox(height: 16),
+              Expanded(
+                child: availableTables.isEmpty
+                    ? Center(child: Text('Tidak ada meja tersedia', style: TextStyle(color: theme.colorScheme.outline)))
+                    : GridView.builder(
+                        controller: scrollCtrl,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 0.85),
+                        itemCount: availableTables.length,
+                        itemBuilder: (_, i) {
+                          final t = availableTables[i];
+                          final sel = _selectedTable?.id == t.id;
+                          return GestureDetector(
+                            onTap: () { setState(() => _selectedTable = t); Navigator.pop(c); },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              decoration: BoxDecoration(
+                                color: sel ? AppTheme.successColor : theme.colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(16),
+                                border: sel ? null : Border.all(color: theme.dividerColor),
+                                boxShadow: sel ? [BoxShadow(color: AppTheme.successColor.withAlpha(60), blurRadius: 12, offset: const Offset(0, 4))] : null,
+                              ),
+                              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                Icon(Icons.table_bar,
+                                    size: 28,
+                                    color: sel ? Colors.white : AppTheme.successColor.withAlpha(180)),
+                                const SizedBox(height: 8),
+                                Text(t.name,
+                                    style: TextStyle(
+                                        fontSize: 16, fontWeight: FontWeight.w700,
+                                        color: sel ? Colors.white : theme.colorScheme.onSurface)),
+                                const SizedBox(height: 2),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: sel ? Colors.white.withAlpha(30) : AppTheme.successColor.withAlpha(20),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text('${t.capacity} org',
+                                      style: TextStyle(
+                                          fontSize: 10, fontWeight: FontWeight.w600,
+                                          color: sel ? Colors.white70 : AppTheme.successColor)),
+                                ),
+                              ]),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ]),
+          );
+        },
       ),
     );
   }

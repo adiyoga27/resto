@@ -60,6 +60,7 @@ class SettingsService extends ChangeNotifier {
 
   Future<String?> createUser(String name, String email, String password,
       String phone, String role) async {
+    if (_restaurantId.isEmpty) return 'Restaurant ID tidak ditemukan';
     try {
       final cred = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -71,7 +72,7 @@ class SettingsService extends ChangeNotifier {
         name: name,
         email: email,
         phone: phone,
-        restaurantName: _settings.name,
+        restaurantName: _settings.name.isNotEmpty ? _settings.name : 'Restoran',
         role: role,
         restaurantId: _restaurantId,
       );

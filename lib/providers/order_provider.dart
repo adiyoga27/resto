@@ -131,7 +131,7 @@ class OrderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> submitOrder({double? taxRate, double? discount, double? serviceCharge}) async {
+  Future<String> submitOrder({double? taxRate, double? discount, double? serviceCharge, bool clearCartAfter = false}) async {
     if (taxRate != null) _lastTaxRate = taxRate;
     if (discount != null) _lastDiscount = discount;
 
@@ -150,7 +150,7 @@ class OrderProvider extends ChangeNotifier {
       discount: _lastDiscount,
     );
     final id = await _firestoreService.createOrder(order);
-    clearCart();
+    if (clearCartAfter) clearCart();
     return id;
   }
 
@@ -186,7 +186,6 @@ class OrderProvider extends ChangeNotifier {
         paymentStatus: PaymentStatus.paid,
         paymentMethod: method,
         amountPaid: amountPaid,
-        status: OrderStatus.completed,
       );
       await _firestoreService.updateOrder(updated);
     } catch (_) {}
