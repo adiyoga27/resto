@@ -13,6 +13,7 @@ import '../../config/theme.dart';
 import '../../services/print_service.dart';
 import '../../widgets/common/receipt_dialog.dart';
 import '../../widgets/common/printer_picker.dart';
+import '../../providers/restaurant_provider.dart';
 
 class OrderScreen extends StatefulWidget {
   const OrderScreen({super.key});
@@ -107,10 +108,15 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 }
 
-class _OrderCard extends StatelessWidget {
+class _OrderCard extends StatefulWidget {
   final OrderModel order;
   const _OrderCard({required this.order});
 
+  @override
+  State<_OrderCard> createState() => _OrderCardState();
+}
+
+class _OrderCardState extends State<_OrderCard> {
   Color _statusColor(OrderStatus s) {
     switch (s) {
       case OrderStatus.pending: return AppTheme.warningColor;
@@ -134,97 +140,156 @@ class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      elevation: 1,
-      child: ExpansionTile(
-        leading: CircleAvatar(
-          backgroundColor: _statusColor(order.status).withAlpha(30),
-          child: Icon(Icons.receipt_long, color: _statusColor(order.status), size: 20),
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: theme.dividerColor.withAlpha(20)),
+      ),
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          collapsedBackgroundColor: Colors.transparent,
+          backgroundColor: isDark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5),
+          leading: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _statusColor(widget.order.status).withAlpha(30),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(Icons.receipt_long, color: _statusColor(widget.order.status), size: 24),
+          ),
+          title: Text('#${widget.order.orderNumber}',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: theme.colorScheme.onSurface)),
+          subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const SizedBox(height: 4),
+            Text(formatDateShort(widget.order.createdAt), style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withAlpha(150))),
+            if (widget.order.customerName.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(widget.order.customerName, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
+            ],
+          ]),
+          trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(formatCurrency(widget.order.total),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: theme.colorScheme.onSurface)),
+            const SizedBox(height: 6),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _paymentColor(widget.order).withAlpha(30),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(_paymentLabel(widget.order),
+                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: _paymentColor(widget.order))),
+              ),
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _statusColor(widget.order.status).withAlpha(30),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(widget.order.status.name.toUpperCase(),
+                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: _statusColor(widget.order.status))),
+              ),
+            ]),
+          ]),
+          childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          children: [
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            if (widget.order.tableName.isNotEmpty) _infoRow(Icons.table_bar, 'Meja: ${widget.order.tableName}', theme),
+            if (widget.order.customerName.isNotEmpty) _infoRow(Icons.person, widget.order.customerName, theme),
+            _infoRow(Icons.storefront, widget.order.orderType.name.toUpperCase(), theme),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.black26 : theme.colorScheme.surfaceContainerHighest.withAlpha(100),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: theme.dividerColor.withAlpha(20)),
+              ),
+              child: Column(
+                children: [
+                  ...widget.order.items.map((item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(children: [
+                      Container(
+                        width: 28, height: 28,
+                        decoration: BoxDecoration(
+                          color: AppTheme.secondaryColor.withAlpha(30), 
+                          borderRadius: BorderRadius.circular(8)
+                        ),
+                        child: Center(
+                          child: Text('${item.quantity}x', 
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.secondaryColor)
+                          )
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(item.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface))),
+                      Text(formatCurrency(item.subtotal), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
+                    ]),
+                  )),
+                  const Divider(height: 24),
+                  if (widget.order.discount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                        const Text('Diskon', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+                        Text('-${formatCurrency(widget.order.discount)}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
+                      ]),
+                    ),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Text('Total Akhir', style: TextStyle(fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface)),
+                    Text(formatCurrency(widget.order.total), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: AppTheme.primaryColor)),
+                  ]),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: Wrap(spacing: 8, runSpacing: 8, children: _actionButtons(context, widget.order)),
+                ),
+              ],
+            ),
+            if (widget.order.status == OrderStatus.completed || widget.order.paymentStatus == PaymentStatus.paid)
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => _handlePrint(context, widget.order),
+                  icon: const Icon(Icons.print_outlined, size: 20),
+                  label: const Text('Cetak Ulang Nota', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+          ],
         ),
-        title: Text('#${order.orderNumber}',
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-        subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(formatDateShort(order.createdAt), style: const TextStyle(fontSize: 12)),
-          if (order.customerName.isNotEmpty)
-            Text(order.customerName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
-        ]),
-        trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(formatCurrency(order.total),
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-          const SizedBox(height: 2),
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: _paymentColor(order).withAlpha(25),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(_paymentLabel(order),
-                  style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: _paymentColor(order))),
-            ),
-            const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: _statusColor(order.status).withAlpha(25),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(order.status.name.toUpperCase(),
-                  style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: _statusColor(order.status))),
-            ),
-          ]),
-        ]),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        children: [
-          if (order.tableName.isNotEmpty) _infoRow(Icons.table_bar, 'Meja: ${order.tableName}', theme),
-          if (order.customerName.isNotEmpty) _infoRow(Icons.person, order.customerName, theme),
-          _infoRow(Icons.storefront, order.orderType.name.toUpperCase(), theme),
-          const Divider(height: 20),
-          ...order.items.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(children: [
-              SizedBox(width: 30, child: Text('${item.quantity}x', style: const TextStyle(fontWeight: FontWeight.w600))),
-              Expanded(child: Text(item.name, style: const TextStyle(fontSize: 13))),
-              Text(formatCurrency(item.subtotal), style: const TextStyle(fontSize: 13)),
-            ]),
-          )),
-          const Divider(height: 20),
-          if (order.discount > 0)
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Diskon', style: TextStyle(color: Colors.red)),
-              Text('-${formatCurrency(order.discount)}', style: const TextStyle(color: Colors.red)),
-            ]),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('Total', style: TextStyle(fontWeight: FontWeight.w700)),
-            Text(formatCurrency(order.total), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          ]),
-          const SizedBox(height: 12),
-          if (order.status != OrderStatus.completed && order.status != OrderStatus.cancelled)
-            Wrap(spacing: 8, runSpacing: 8, children: _actionButtons(context, order)),
-          if (order.status == OrderStatus.completed || order.paymentStatus == PaymentStatus.paid)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: OutlinedButton.icon(
-                onPressed: () => _handlePrint(context, order),
-                icon: const Icon(Icons.print, size: 16),
-                label: const Text('Cetak Ulang'),
-              ),
-            ),
-        ],
       ),
     );
   }
 
   Widget _infoRow(IconData icon, String text, ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 3),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(children: [
-        Icon(icon, size: 14, color: theme.colorScheme.outline),
-        const SizedBox(width: 6),
-        Text(text, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withAlpha(180))),
+        Icon(icon, size: 16, color: theme.colorScheme.outline),
+        const SizedBox(width: 8),
+        Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface.withAlpha(200))),
       ]),
     );
   }
@@ -234,19 +299,18 @@ class _OrderCard extends StatelessWidget {
     final buttons = <Widget>[];
     final bool isPaid = order.paymentStatus == PaymentStatus.paid;
 
-    if (!isPaid) {
-      buttons.add(ElevatedButton.icon(
+    if (!isPaid && order.status != OrderStatus.cancelled) {
+      buttons.add(FilledButton.icon(
         onPressed: () => _showPaymentDialog(context, order),
-        icon: const Icon(Icons.payment, size: 16),
-        label: const Text('BAYAR', style: TextStyle(fontSize: 11)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.secondaryColor,
+        icon: const Icon(Icons.payments_outlined, size: 18),
+        label: const Text('BAYAR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+        style: FilledButton.styleFrom(
+          backgroundColor: AppTheme.successColor,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ));
-      buttons.add(const SizedBox(width: 4));
     }
 
     if (isPaid) {
@@ -261,38 +325,48 @@ class _OrderCard extends StatelessWidget {
       if (next != null) {
         buttons.add(ElevatedButton.icon(
           onPressed: () => prov.updateOrderStatus(order.id, next!),
-          icon: const Icon(Icons.arrow_forward, size: 16),
-          label: Text(next.name.toUpperCase(), style: const TextStyle(fontSize: 11)),
+          icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+          label: Text(next.name.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.successColor.withAlpha(220),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            backgroundColor: AppTheme.secondaryColor.withAlpha(20),
+            foregroundColor: AppTheme.secondaryColor,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ));
-        buttons.add(const SizedBox(width: 4));
       }
     }
 
-    buttons.add(TextButton.icon(
-      onPressed: () async {
-        final confirm = await showDialog<bool>(
-          context: context,
-          builder: (c) => AlertDialog(
-            title: const Text('Batalkan?'),
-            content: const Text('Yakin ingin membatalkan pesanan ini?'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Tidak')),
-              TextButton(onPressed: () => Navigator.pop(c, true),
-                  child: const Text('Ya', style: TextStyle(color: Colors.red))),
-            ],
-          ),
-        );
-        if (confirm == true) prov.updateOrderStatus(order.id, OrderStatus.cancelled);
-      },
-      icon: const Icon(Icons.cancel, size: 16, color: Colors.red),
-      label: const Text('Batal', style: TextStyle(color: Colors.red, fontSize: 11)),
-    ));
+    if (order.status != OrderStatus.completed && order.status != OrderStatus.cancelled) {
+      buttons.add(TextButton.icon(
+        onPressed: () async {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (c) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              title: const Text('Batalkan Pesanan?'),
+              content: const Text('Yakin ingin membatalkan pesanan ini? Aksi ini tidak dapat dibatalkan.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Tidak')),
+                FilledButton(
+                  onPressed: () => Navigator.pop(c, true),
+                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Ya, Batalkan'),
+                ),
+              ],
+            ),
+          );
+          if (confirm == true) prov.updateOrderStatus(order.id, OrderStatus.cancelled);
+        },
+        icon: const Icon(Icons.cancel_outlined, size: 18),
+        label: const Text('Batal', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+        style: TextButton.styleFrom(
+          foregroundColor: Colors.red,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+      ));
+    }
 
     return buttons;
   }
@@ -309,49 +383,65 @@ class _OrderCard extends StatelessWidget {
         final change = paid - order.total;
 
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Pembayaran'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('Pembayaran', style: TextStyle(fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Total: ${formatCurrency(order.total)}',
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 16),
+              Text('Total Tagihan', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.outline)),
+              const SizedBox(height: 4),
+              Text(formatCurrency(order.total),
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.primaryColor)),
+              const SizedBox(height: 24),
               const Text('Metode Pembayaran', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Wrap(spacing: 8, children: PaymentMethod.values.map((m) {
+              const SizedBox(height: 12),
+              Wrap(spacing: 8, runSpacing: 8, children: PaymentMethod.values.map((m) {
                 final sel = method == m;
                 String label; IconData icon;
                 switch (m) {
-                  case PaymentMethod.cash: label = 'Tunai'; icon = Icons.money; break;
+                  case PaymentMethod.cash: label = 'Tunai'; icon = Icons.payments_outlined; break;
                   case PaymentMethod.card: label = 'Kartu'; icon = Icons.credit_card; break;
-                  case PaymentMethod.qris: label = 'QRIS'; icon = Icons.qr_code; break;
+                  case PaymentMethod.qris: label = 'QRIS'; icon = Icons.qr_code_2; break;
                 }
                 return ChoiceChip(
-                  avatar: Icon(icon, size: 18),
+                  avatar: Icon(icon, size: 18, color: sel ? Colors.white : AppTheme.secondaryColor),
                   label: Text(label),
                   selected: sel,
-                  selectedColor: AppTheme.secondaryColor.withAlpha(30),
+                  selectedColor: AppTheme.secondaryColor,
+                  labelStyle: TextStyle(
+                    color: sel ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                    fontWeight: sel ? FontWeight.w600 : FontWeight.normal
+                  ),
                   onSelected: (_) => setDialogState(() => method = m),
                 );
               }).toList()),
               if (method == PaymentMethod.cash) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 TextField(
                   controller: amountCtrl,
-                  decoration: const InputDecoration(labelText: 'Jumlah Dibayar', prefixText: 'Rp ', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                    labelText: 'Jumlah Dibayar', 
+                    prefixText: 'Rp ', 
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16))
+                  ),
                   keyboardType: TextInputType.number,
                   onChanged: (_) => setDialogState(() {}),
                 ),
                 if (change >= 0) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: Colors.green.withAlpha(20), borderRadius: BorderRadius.circular(16)),
                     child: Row(children: [
-                      const Icon(Icons.money, color: Colors.green),
-                      const SizedBox(width: 8),
-                      Text('Kembalian: ${formatCurrency(change)}',
-                          style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w700, fontSize: 15)),
+                      const Icon(Icons.check_circle, color: Colors.green),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Kembalian', style: TextStyle(fontSize: 11, color: Colors.green)),
+                          Text(formatCurrency(change),
+                              style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w800, fontSize: 16)),
+                        ],
+                      ),
                     ]),
                   ),
                 ],
@@ -375,6 +465,10 @@ class _OrderCard extends StatelessWidget {
               },
               icon: const Icon(Icons.check, size: 18),
               label: Text('Bayar ${formatCurrency(order.total)}'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.successColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+              ),
             ),
           ],
         );
@@ -411,7 +505,6 @@ class CreateOrderScreen extends StatefulWidget {
 class _CreateOrderScreenState extends State<CreateOrderScreen> {
   final _searchCtrl = TextEditingController();
   final _customerCtrl = TextEditingController();
-  final _taxCtrl = TextEditingController(text: '10');
   final _discountCtrl = TextEditingController(text: '0');
   final _discountPercentCtrl = TextEditingController(text: '0');
   String _searchQuery = '';
@@ -431,12 +524,11 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     final prov = context.read<OrderProvider>();
     _customerCtrl.text = prov.currentCustomerName;
     _orderType = prov.currentOrderType;
-    _taxCtrl.text = ((prov.currentTaxRate) * 100).toStringAsFixed(0);
     _discountCtrl.text = prov.currentDiscount.toStringAsFixed(0);
     if (prov.currentTableId.isNotEmpty) {
       _selectedTable = TableModel(id: prov.currentTableId, name: prov.currentTableName);
     }
-    prov.firestoreService.setUserId(auth.userId);
+    prov.firestoreService.setRestaurantId(auth.restaurantId);
     prov.firestoreService.streamTables().listen((tables) {
       if (mounted) setState(() => _tables = tables);
     });
@@ -444,12 +536,13 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
   @override
   void dispose() {
-    _searchCtrl.dispose(); _customerCtrl.dispose(); _taxCtrl.dispose();
+    _searchCtrl.dispose(); _customerCtrl.dispose();
     _discountCtrl.dispose(); _discountPercentCtrl.dispose(); _amountPaidCtrl.dispose();
     super.dispose();
   }
 
-  double get _taxRate => (double.tryParse(_taxCtrl.text) ?? 10) / 100;
+  double get _taxRate => context.read<RestaurantProvider>().taxRate;
+  double get _serviceCharge => context.read<RestaurantProvider>().serviceCharge;
   double get _discountAmount {
     if (_useDiscountPercent) {
       return _cartSubtotal * ((double.tryParse(_discountPercentCtrl.text) ?? 0) / 100);
@@ -458,7 +551,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   }
   double get _cartSubtotal => context.read<OrderProvider>().cart.fold(0, (s, i) => s + i.subtotal);
   double get _cartTax => _cartSubtotal * _taxRate;
-  double get _cartTotal => _cartSubtotal + _cartTax - _discountAmount;
+  double get _cartService => _cartSubtotal * _serviceCharge;
+  double get _cartTotal => _cartSubtotal + _cartTax + _cartService - _discountAmount;
   double get _amountPaid => double.tryParse(_amountPaidCtrl.text) ?? _cartTotal;
   double get _change => _amountPaid - _cartTotal;
 
@@ -486,7 +580,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       prov.setTable('', '');
     }
 
-    final id = await prov.submitOrder(taxRate: _taxRate, discount: _discountAmount);
+    final id = await prov.submitOrder(taxRate: _taxRate, discount: _discountAmount, serviceCharge: _serviceCharge);
     _createdOrderId = id;
     _amountPaidCtrl.text = _cartTotal.toStringAsFixed(0);
     setState(() => _showPayment = true);
@@ -802,20 +896,6 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         boxShadow: [BoxShadow(color: theme.shadowColor.withAlpha(20), blurRadius: 6, offset: const Offset(0, 2))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        TextField(
-          controller: _customerCtrl,
-          decoration: InputDecoration(
-            hintText: 'Nama Pelanggan (wajib) *',
-            prefixIcon: const Icon(Icons.person, size: 20),
-            filled: true,
-            fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          ),
-          style: const TextStyle(fontSize: 14),
-        ),
-        const SizedBox(height: 8),
         Wrap(spacing: 8, runSpacing: 6, children: [
           _typeChip('Makan di Tempat', Icons.table_bar, OrderType.dineIn, theme),
           _typeChip('Bawa Pulang', Icons.takeout_dining, OrderType.takeAway, theme),
@@ -833,6 +913,20 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               onPressed: _showTablePicker,
             ),
         ]),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _customerCtrl,
+          decoration: InputDecoration(
+            hintText: 'Nama Pelanggan (wajib) *',
+            prefixIcon: const Icon(Icons.person, size: 20),
+            filled: true,
+            fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          ),
+          style: const TextStyle(fontSize: 14),
+        ),
       ]),
     );
   }
@@ -895,45 +989,28 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(border: Border(bottom: BorderSide(color: theme.dividerColor))),
-      child: Column(children: [
-        TextField(
-          controller: _customerCtrl,
-          decoration: const InputDecoration(labelText: 'Nama Pelanggan', prefixIcon: Icon(Icons.person_outline, size: 20),
-              border: OutlineInputBorder(), isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+      child: Row(children: [
+        Expanded(
+          flex: 2,
+          child: _useDiscountPercent
+              ? TextField(
+                  controller: _discountPercentCtrl,
+                  decoration: const InputDecoration(labelText: 'Diskon (%)', suffixText: '%', border: OutlineInputBorder(),
+                      isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+                  keyboardType: TextInputType.number,
+                )
+              : TextField(
+                  controller: _discountCtrl,
+                  decoration: const InputDecoration(labelText: 'Diskon (Rp)', prefixText: 'Rp ', border: OutlineInputBorder(),
+                      isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+                  keyboardType: TextInputType.number,
+                ),
         ),
-        const SizedBox(height: 10),
-        Row(children: [
-          Expanded(
-            child: TextField(
-              controller: _taxCtrl,
-              decoration: const InputDecoration(labelText: 'Pajak (%)', suffixText: '%', border: OutlineInputBorder(),
-                  isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-              keyboardType: TextInputType.number,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            flex: 2,
-            child: _useDiscountPercent
-                ? TextField(
-                    controller: _discountPercentCtrl,
-                    decoration: const InputDecoration(labelText: 'Diskon (%)', suffixText: '%', border: OutlineInputBorder(),
-                        isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-                    keyboardType: TextInputType.number,
-                  )
-                : TextField(
-                    controller: _discountCtrl,
-                    decoration: const InputDecoration(labelText: 'Diskon (Rp)', prefixText: 'Rp ', border: OutlineInputBorder(),
-                        isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-                    keyboardType: TextInputType.number,
-                  ),
-          ),
-          IconButton(
-            icon: Icon(_useDiscountPercent ? Icons.percent : Icons.monetization_on_outlined, size: 20),
-            onPressed: () => setState(() => _useDiscountPercent = !_useDiscountPercent),
-            tooltip: 'Ganti tipe diskon',
-          ),
-        ]),
+        IconButton(
+          icon: Icon(_useDiscountPercent ? Icons.percent : Icons.monetization_on_outlined, size: 20),
+          onPressed: () => setState(() => _useDiscountPercent = !_useDiscountPercent),
+          tooltip: 'Ganti tipe diskon',
+        ),
       ]),
     );
   }
@@ -1013,11 +1090,12 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               Expanded(child: Text(orderInfo, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
             ]),
           ),
-        _totalRow('Subtotal', _cartSubtotal, theme),
-        _totalRow('Pajak (${_taxCtrl.text}%)', _cartTax, theme),
-        if (_discountAmount > 0) _totalRow('Diskon', -_discountAmount, theme, color: Colors.red),
-        Divider(color: theme.dividerColor),
-        _totalRow('Total', _cartTotal, theme, bold: true),
+          _totalRow('Subtotal', _cartSubtotal, theme),
+          _totalRow('Pajak (${(_taxRate * 100).toStringAsFixed(0)}%)', _cartTax, theme),
+          _totalRow('Service (${(_serviceCharge * 100).toStringAsFixed(0)}%)', _cartService, theme),
+          if (_discountAmount > 0) _totalRow('Diskon', -_discountAmount, theme, color: Colors.red),
+          Divider(color: theme.dividerColor),
+          _totalRow('Total', _cartTotal, theme, bold: true),
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity, height: 48,
@@ -1058,15 +1136,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       ),
       child: Row(children: [
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${prov.cartItemCount} item | $orderInfo',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
-            TextField(
-              controller: _customerCtrl,
-              decoration: const InputDecoration(hintText: 'Nama Pelanggan (wajib) *', isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.zero),
-              style: const TextStyle(fontSize: 13),
-            ),
-          ]),
+          child: Text('${prov.cartItemCount} item | $orderInfo',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
         ),
         const SizedBox(width: 8),
         FilledButton(

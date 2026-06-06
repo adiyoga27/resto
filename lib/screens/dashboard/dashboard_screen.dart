@@ -47,39 +47,68 @@ class DashboardScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: const LinearGradient(
                     colors: [
                       AppTheme.primaryColor,
                       AppTheme.accentColor,
                     ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryColor.withAlpha(50),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(getGreeting(auth.userName, true),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        )),
-                    const SizedBox(height: 4),
-                    Text(l10n.appDescription,
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 13)),
-                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(getGreeting(auth.userName, true),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  )),
+                              const SizedBox(height: 4),
+                              Text(l10n.appDescription,
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 14)),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(30),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(Icons.analytics_outlined, color: Colors.white, size: 32),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
                     Text(formatCurrency(todayRevenue),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 32,
+                          fontSize: 36,
                           fontWeight: FontWeight.bold,
                         )),
+                    const SizedBox(height: 4),
                     Text('${l10n.todaySales} • $todayRevenue',
                         style: const TextStyle(
-                            color: Colors.white70, fontSize: 12)),
+                            color: Colors.white70, fontSize: 13)),
                   ],
                 ),
               ),
@@ -215,34 +244,42 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 0,
-      color: color.withAlpha(15),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withAlpha(25),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 22),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(25),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const Spacer(),
+                Icon(Icons.arrow_forward_ios, color: Theme.of(context).colorScheme.onSurface.withAlpha(50), size: 12),
+              ],
             ),
             const Spacer(),
-            Text(value,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                )),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(value,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  )),
+            ),
             const SizedBox(height: 2),
             Text(label,
                 style: TextStyle(
-                    fontSize: 12, color: color.withAlpha(180)),
+                    fontSize: 12, 
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.onSurface.withAlpha(150)),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis),
           ],

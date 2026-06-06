@@ -8,7 +8,7 @@ class OrderProvider extends ChangeNotifier {
   FirestoreService get firestoreService => _firestoreService;
   final Uuid _uuid = const Uuid();
 
-  String _userId = '';
+  String _restaurantId = '';
   List<OrderModel> _orders = [];
   List<OrderItem> _cart = [];
   OrderType _currentOrderType = OrderType.dineIn;
@@ -62,9 +62,9 @@ class OrderProvider extends ChangeNotifier {
     }
   }
 
-  void setUserId(String uid) {
-    _userId = uid;
-    _firestoreService.setUserId(uid);
+  void setRestaurantId(String id) {
+    _restaurantId = id;
+    _firestoreService.setRestaurantId(id);
   }
 
   void init() {
@@ -131,7 +131,7 @@ class OrderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> submitOrder({double? taxRate, double? discount}) async {
+  Future<String> submitOrder({double? taxRate, double? discount, double? serviceCharge}) async {
     if (taxRate != null) _lastTaxRate = taxRate;
     if (discount != null) _lastDiscount = discount;
 
@@ -146,6 +146,7 @@ class OrderProvider extends ChangeNotifier {
       orderType: _currentOrderType,
       items: List.from(_cart),
       taxRate: _lastTaxRate,
+      serviceCharge: serviceCharge ?? 0.02,
       discount: _lastDiscount,
     );
     final id = await _firestoreService.createOrder(order);

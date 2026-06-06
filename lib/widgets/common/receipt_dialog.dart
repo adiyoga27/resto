@@ -144,6 +144,10 @@ class ReceiptPreview extends StatelessWidget {
                     _row(
                         'Pajak (${(order.taxRate * 100).toStringAsFixed(0)}%)',
                         formatCurrency(order.taxAmount)),
+                  if (order.serviceCharge > 0)
+                    _row(
+                        'Service (${(order.serviceCharge * 100).toStringAsFixed(0)}%)',
+                        formatCurrency(order.serviceAmount)),
                   if (order.discount > 0)
                     _row('Diskon', '-${formatCurrency(order.discount)}',
                         color: Colors.red),

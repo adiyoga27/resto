@@ -43,20 +43,36 @@ class PrintService {
     try {
       _device = device;
       await device.connect(autoConnect: false);
+      await Future.delayed(const Duration(milliseconds: 500));
       final services = await device.discoverServices();
 
+      BluetoothCharacteristic? writeChar;
+      BluetoothCharacteristic? writeNoRespChar;
+
       for (final service in services) {
+        debugPrint('Service: ${service.uuid}');
         for (final char in service.characteristics) {
-          if (char.properties.write || char.properties.writeWithoutResponse) {
-            _printChar = char;
-            break;
+          debugPrint('  Char: ${char.uuid} props=${char.properties}');
+          if (char.properties.write) {
+            writeChar = char;
+          }
+          if (char.properties.writeWithoutResponse) {
+            writeNoRespChar = char;
           }
         }
-        if (_printChar != null) break;
+      }
+
+      _printChar = writeNoRespChar ?? writeChar;
+
+      if (_printChar != null) {
+        debugPrint('Found print char: ${_printChar!.uuid}');
+      } else {
+        debugPrint('No writable characteristic found!');
       }
 
       return _printChar != null;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Connect error: $e');
       return false;
     }
   }
@@ -165,6 +181,16 @@ class PrintService {
         ]));
       }
 
+      if (order.serviceCharge > 0) {
+        bytes.addAll(generator.row([
+          PosColumn(text: 'Service (${(order.serviceCharge * 100).toStringAsFixed(0)}%)', width: 6),
+          PosColumn(
+              text: formatCurrency(order.serviceAmount),
+              width: 6,
+              styles: const PosStyles(align: PosAlign.right)),
+        ]));
+      }
+
       if (order.discount > 0) {
         bytes.addAll(generator.row([
           PosColumn(text: 'Diskon', width: 6),
@@ -206,7 +232,19 @@ class PrintService {
       bytes.addAll(generator.emptyLines(2));
       bytes.addAll(generator.cut());
 
-      await _printChar!.write(bytes, withoutResponse: false);
+      debugPrint('Printing ${bytes.length} bytes...');
+
+      if (_printChar!.properties.writeWithoutResponse) {
+        const chunkSize = 20;
+        for (var i = 0; i < bytes.length; i += chunkSize) {
+          final end = (i + chunkSize > bytes.length) ? bytes.length : i + chunkSize;
+          await _printChar!.write(bytes.sublist(i, end), withoutResponse: true);
+        }
+      } else {
+        await _printChar!.write(bytes, withoutResponse: false);
+      }
+
+      debugPrint('Print completed');
       return true;
     } catch (e) {
       debugPrint('Print error: $e');

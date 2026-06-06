@@ -8,7 +8,6 @@ class MenuProvider extends ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
   final Uuid _uuid = const Uuid();
 
-  String _userId = '';
   List<MenuCategory> _categories = [];
   List<MenuItem> _items = [];
   String _selectedCategoryId = '';
@@ -34,9 +33,8 @@ class MenuProvider extends ChangeNotifier {
     }
   }
 
-  void setUserId(String uid) {
-    _userId = uid;
-    _firestoreService.setUserId(uid);
+  void setRestaurantId(String id) {
+    _firestoreService.setRestaurantId(id);
   }
 
   void init() {

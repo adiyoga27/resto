@@ -9,19 +9,19 @@ import '../models/table.dart' as table_model;
 class FirestoreService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Uuid _uuid = const Uuid();
-  String _userId = '';
+  String _restaurantId = '';
 
-  void setUserId(String uid) {
-    _userId = uid;
+  void setRestaurantId(String id) {
+    _restaurantId = id;
   }
 
   // ─── Menu Categories ───────────────────────────────────────────
 
   Stream<List<MenuCategory>> streamCategories() {
-    if (_userId.isEmpty) return Stream.value([]);
+    if (_restaurantId.isEmpty) return Stream.value([]);
     return _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('categories')
         .orderBy('order')
         .snapshots()
@@ -33,8 +33,8 @@ class FirestoreService extends ChangeNotifier {
     final id = _uuid.v4();
     final category = MenuCategory(id: id, name: name);
     await _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('categories')
         .doc(id)
         .set(category.toMap());
@@ -42,8 +42,8 @@ class FirestoreService extends ChangeNotifier {
 
   Future<void> updateCategory(MenuCategory category) async {
     await _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('categories')
         .doc(category.id)
         .update(category.toMap());
@@ -51,8 +51,8 @@ class FirestoreService extends ChangeNotifier {
 
   Future<void> deleteCategory(String id) async {
     await _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('categories')
         .doc(id)
         .delete();
@@ -61,10 +61,10 @@ class FirestoreService extends ChangeNotifier {
   // ─── Menu Items ────────────────────────────────────────────────
 
   Stream<List<MenuItem>> streamMenuItems({String? categoryId}) {
-    if (_userId.isEmpty) return Stream.value([]);
+    if (_restaurantId.isEmpty) return Stream.value([]);
     Query<Map<String, dynamic>> query = _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('menuItems');
     if (categoryId != null && categoryId.isNotEmpty) {
       query = query.where('categoryId', isEqualTo: categoryId);
@@ -76,8 +76,8 @@ class FirestoreService extends ChangeNotifier {
 
   Future<void> addMenuItem(MenuItem item) async {
     await _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('menuItems')
         .doc(item.id)
         .set(item.toMap());
@@ -85,8 +85,8 @@ class FirestoreService extends ChangeNotifier {
 
   Future<void> updateMenuItem(MenuItem item) async {
     await _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('menuItems')
         .doc(item.id)
         .update(item.toMap());
@@ -94,8 +94,8 @@ class FirestoreService extends ChangeNotifier {
 
   Future<void> deleteMenuItem(String id) async {
     await _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('menuItems')
         .doc(id)
         .delete();
@@ -104,10 +104,10 @@ class FirestoreService extends ChangeNotifier {
   // ─── Orders ────────────────────────────────────────────────────
 
   Stream<List<OrderModel>> streamOrders({String? statusFilter}) {
-    if (_userId.isEmpty) return Stream.value([]);
+    if (_restaurantId.isEmpty) return Stream.value([]);
     Query<Map<String, dynamic>> query = _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('orders')
         .orderBy('createdAt', descending: true);
     if (statusFilter != null && statusFilter != 'all') {
@@ -122,8 +122,8 @@ class FirestoreService extends ChangeNotifier {
   Future<String> createOrder(OrderModel order) async {
     final id = _uuid.v4();
     await _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('orders')
         .doc(id)
         .set(order.toMap()..['id'] = id);
@@ -132,8 +132,8 @@ class FirestoreService extends ChangeNotifier {
 
   Future<void> updateOrder(OrderModel order) async {
     await _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('orders')
         .doc(order.id)
         .update(order.toMap());
@@ -141,8 +141,8 @@ class FirestoreService extends ChangeNotifier {
 
   Future<void> deleteOrder(String id) async {
     await _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('orders')
         .doc(id)
         .delete();
@@ -151,21 +151,22 @@ class FirestoreService extends ChangeNotifier {
   // ─── Tables ────────────────────────────────────────────────────
 
   Stream<List<table_model.TableModel>> streamTables() {
-    if (_userId.isEmpty) return Stream.value([]);
+    if (_restaurantId.isEmpty) return Stream.value([]);
     return _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('tables')
         .orderBy('name')
         .snapshots()
-        .map((snap) =>
-            snap.docs.map((d) => table_model.TableModel.fromMap(d.data())).toList());
+        .map((snap) => snap.docs
+            .map((d) => table_model.TableModel.fromMap(d.data()))
+            .toList());
   }
 
   Future<void> addTable(table_model.TableModel table) async {
     await _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('tables')
         .doc(table.id)
         .set(table.toMap());
@@ -173,8 +174,8 @@ class FirestoreService extends ChangeNotifier {
 
   Future<void> updateTable(table_model.TableModel table) async {
     await _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('tables')
         .doc(table.id)
         .update(table.toMap());
@@ -182,10 +183,11 @@ class FirestoreService extends ChangeNotifier {
 
   Future<void> deleteTable(String id) async {
     await _firestore
-        .collection('users')
-        .doc(_userId)
+        .collection('restaurants')
+        .doc(_restaurantId)
         .collection('tables')
         .doc(id)
         .delete();
   }
 }
+

@@ -56,6 +56,7 @@ class OrderModel {
   final PaymentStatus paymentStatus;
   final PaymentMethod paymentMethod;
   final double taxRate;
+  final double serviceCharge;
   final double discount;
   final double amountPaid;
   final DateTime createdAt;
@@ -72,7 +73,8 @@ class OrderModel {
     this.status = OrderStatus.pending,
     this.paymentStatus = PaymentStatus.unpaid,
     this.paymentMethod = PaymentMethod.cash,
-    this.taxRate = 0.1,
+    this.taxRate = 0.11,
+    this.serviceCharge = 0.02,
     this.discount = 0,
     this.amountPaid = 0,
     DateTime? createdAt,
@@ -85,7 +87,9 @@ class OrderModel {
 
   double get taxAmount => subtotal * taxRate;
 
-  double get total => subtotal + taxAmount - discount;
+  double get serviceAmount => subtotal * serviceCharge;
+
+  double get total => subtotal + taxAmount + serviceAmount - discount;
 
   double get change => amountPaid - total;
 
@@ -105,6 +109,7 @@ class OrderModel {
       'paymentStatus': paymentStatus.name,
       'paymentMethod': paymentMethod.name,
       'taxRate': taxRate,
+      'serviceCharge': serviceCharge,
       'discount': discount,
       'amountPaid': amountPaid,
       'createdAt': createdAt.toIso8601String(),
@@ -139,7 +144,8 @@ class OrderModel {
         (e) => e.name == map['paymentMethod'],
         orElse: () => PaymentMethod.cash,
       ),
-      taxRate: (map['taxRate'] ?? 0.1).toDouble(),
+      taxRate: (map['taxRate'] ?? 0.11).toDouble(),
+      serviceCharge: (map['serviceCharge'] ?? 0.02).toDouble(),
       discount: (map['discount'] ?? 0).toDouble(),
       amountPaid: (map['amountPaid'] ?? 0).toDouble(),
       createdAt: map['createdAt'] != null
@@ -161,6 +167,7 @@ class OrderModel {
     PaymentStatus? paymentStatus,
     PaymentMethod? paymentMethod,
     double? taxRate,
+    double? serviceCharge,
     double? discount,
     double? amountPaid,
   }) {
@@ -176,6 +183,7 @@ class OrderModel {
       paymentStatus: paymentStatus ?? this.paymentStatus,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       taxRate: taxRate ?? this.taxRate,
+      serviceCharge: serviceCharge ?? this.serviceCharge,
       discount: discount ?? this.discount,
       amountPaid: amountPaid ?? this.amountPaid,
       createdAt: createdAt,

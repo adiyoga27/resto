@@ -24,8 +24,8 @@ class _TableScreenState extends State<TableScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final uid = context.read<AuthProvider>().userId;
-      _fs.setUserId(uid);
+      final restaurantId = context.read<AuthProvider>().restaurantId;
+      _fs.setRestaurantId(restaurantId);
       _fs.streamTables().listen((tables) {
         if (mounted) setState(() => _tables = tables);
       });
@@ -44,25 +44,35 @@ class _TableScreenState extends State<TableScreen> {
       builder: (c) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: Text(existing != null ? l10n.edit : l10n.addTable),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: Text(existing != null ? l10n.edit : l10n.addTable, style: const TextStyle(fontWeight: FontWeight.bold)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: nameCtrl,
-                  decoration: InputDecoration(labelText: l10n.tableName),
+                  decoration: InputDecoration(
+                    labelText: l10n.tableName,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
                   autofocus: true,
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: capCtrl,
-                  decoration: InputDecoration(labelText: l10n.capacity),
+                  decoration: InputDecoration(
+                    labelText: l10n.capacity,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
                   value: floor,
-                  decoration: const InputDecoration(labelText: 'Lantai'),
+                  decoration: InputDecoration(
+                    labelText: 'Lantai',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
                   items: [1, 2, 3]
                       .map((f) => DropdownMenuItem(
                           value: f, child: Text('Lantai $f')))
@@ -106,7 +116,8 @@ class _TableScreenState extends State<TableScreen> {
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text(l10n.delete),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text(l10n.delete, style: const TextStyle(fontWeight: FontWeight.bold)),
         content: Text(l10n.confirmDelete),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c), child: Text(l10n.cancel)),

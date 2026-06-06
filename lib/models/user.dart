@@ -7,6 +7,7 @@ class UserModel {
   final String phone;
   final String restaurantName;
   final String role;
+  final String restaurantId;
 
   UserModel({
     required this.uid,
@@ -15,6 +16,7 @@ class UserModel {
     required this.phone,
     this.restaurantName = '',
     this.role = 'superadmin',
+    this.restaurantId = '',
   });
 
   bool get isSuperAdmin => role == 'superadmin';
@@ -29,6 +31,7 @@ class UserModel {
       'phone': phone,
       'restaurantName': restaurantName,
       'role': role,
+      'restaurantId': restaurantId,
     };
   }
 
@@ -40,6 +43,7 @@ class UserModel {
       phone: map['phone'] ?? '',
       restaurantName: map['restaurantName'] ?? '',
       role: map['role'] ?? 'superadmin',
+      restaurantId: map['restaurantId'] ?? '',
     );
   }
 }

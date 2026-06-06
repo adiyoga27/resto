@@ -93,17 +93,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSidebar(AppLocalizations l10n, ResponsiveLayout responsive) {
     final auth = context.watch<AuthProvider>();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       width: responsive.sidebarWidth,
-      color: AppTheme.primaryColor,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(
+          right: BorderSide(
+            color: theme.colorScheme.onSurface.withAlpha(15),
+            width: 1,
+          ),
+        ),
+      ),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: Colors.white12),
+                bottom: BorderSide(color: theme.colorScheme.onSurface.withAlpha(15)),
               ),
             ),
             child: Column(
@@ -114,18 +124,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(20),
+                        color: theme.colorScheme.primary.withAlpha(isDark ? 50 : 30),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.restaurant_menu,
-                          color: Colors.white, size: 28),
+                      child: Icon(Icons.restaurant_menu,
+                          color: theme.colorScheme.primary, size: 28),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         l10n.appName,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -133,28 +143,35 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
                   auth.restaurantName.isNotEmpty
                       ? auth.restaurantName
                       : l10n.appSubtitle,
-                  style: TextStyle(color: Colors.white60, fontSize: 12),
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface.withAlpha(150),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
                 _sidebarItem(Icons.dashboard, l10n.dashboard, 0),
                 _sidebarItem(Icons.restaurant_menu, l10n.menu, 1),
                 _sidebarItem(Icons.receipt_long, l10n.orders, 2),
                 _sidebarItem(Icons.table_bar, l10n.tables, 3),
                 _sidebarItem(Icons.bar_chart, l10n.reports, 4),
-                const SizedBox(height: 16),
-                const Divider(color: Colors.white12),
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Divider(color: theme.colorScheme.onSurface.withAlpha(15)),
+                ),
                 const SizedBox(height: 8),
                 _sidebarItem(Icons.settings, l10n.settings, 5),
               ],
@@ -162,8 +179,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Colors.white12)),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: theme.colorScheme.onSurface.withAlpha(15))),
             ),
             child: InkWell(
               onTap: () async {
@@ -178,6 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Text(l10n.cancel)),
                       TextButton(
                           onPressed: () => Navigator.pop(c, true),
+                          style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
                           child: Text(l10n.logout)),
                     ],
                   ),
@@ -189,15 +207,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                 }
               },
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               child: Padding(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 child: Row(
                   children: [
-                    const Icon(Icons.logout, color: Colors.white60, size: 20),
+                    Icon(Icons.logout, color: AppTheme.errorColor.withAlpha(200), size: 22),
                     const SizedBox(width: 12),
                     Text(l10n.logout,
-                        style: const TextStyle(color: Colors.white60)),
+                        style: TextStyle(
+                            color: AppTheme.errorColor.withAlpha(200),
+                            fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -210,30 +230,36 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _sidebarItem(IconData icon, String label, int index) {
     final isSelected = _currentIndex == index;
+    final theme = Theme.of(context);
+    
     return InkWell(
       onTap: () => setState(() => _currentIndex = index),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.secondaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           children: [
-            Icon(icon,
-                color: isSelected ? Colors.white : Colors.white60,
-                size: 22),
-            const SizedBox(width: 12),
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : theme.colorScheme.onSurface.withAlpha(150),
+              size: 22,
+            ),
+            const SizedBox(width: 16),
             Expanded(
-              child: Text(label,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.white60,
-                    fontSize: 14,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  )),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : theme.colorScheme.onSurface.withAlpha(180),
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
             ),
           ],
         ),

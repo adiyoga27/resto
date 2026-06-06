@@ -14,6 +14,9 @@ class AuthService extends ChangeNotifier {
   String get userId => _currentUser?.uid ?? '';
   String get userName => _currentUser?.name ?? '';
   String get restaurantName => _currentUser?.restaurantName ?? '';
+  String get restaurantId => _currentUser?.restaurantId ?? '';
+  bool get isSuperAdmin => _currentUser?.isSuperAdmin ?? false;
+  String get role => _currentUser?.role ?? '';
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
@@ -21,7 +24,8 @@ class AuthService extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      await _auth.signInWithEmailAndPassword(
+          email: email, password: password);
       await _loadUserData();
       return true;
     } catch (e) {
@@ -46,18 +50,37 @@ class AuthService extends ChangeNotifier {
         email: email,
         password: password,
       );
+
+      final restaurantId = cred.user!.uid;
+
       final user = UserModel(
         uid: cred.user!.uid,
         name: name,
         email: email,
         phone: phone,
         restaurantName: restaurantName,
-        role: role,
+        role: 'superadmin',
+        restaurantId: restaurantId,
       );
+
       await FirebaseFirestore.instance
           .collection('users')
           .doc(cred.user!.uid)
           .set(user.toMap());
+
+      await FirebaseFirestore.instance
+          .collection('restaurants')
+          .doc(restaurantId)
+          .set({
+        'name': restaurantName,
+        'address': '',
+        'phone': phone,
+        'email': email,
+        'taxRate': 0.11,
+        'serviceCharge': 0.02,
+        'currency': 'IDR',
+      });
+
       _currentUser = user;
       _isLoading = false;
       notifyListeners();

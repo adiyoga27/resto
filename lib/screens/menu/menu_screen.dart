@@ -30,12 +30,13 @@ class _MenuScreenState extends State<MenuScreen> {
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text(l10n.addCategory),
         content: TextField(
           controller: nameCtrl,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Nama Kategori',
-            border: OutlineInputBorder(),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
             prefixIcon: Icon(Icons.category_outlined),
           ),
           autofocus: true,
@@ -62,12 +63,13 @@ class _MenuScreenState extends State<MenuScreen> {
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text(l10n.editCategory),
         content: TextField(
           controller: nameCtrl,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Nama Kategori',
-            border: OutlineInputBorder(),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
           ),
           autofocus: true,
         ),
@@ -199,9 +201,9 @@ class _MenuScreenState extends State<MenuScreen> {
                     TextField(
                       controller: nameCtrl,
                       style: const TextStyle(fontSize: 15),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Nama Menu',
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                         prefixIcon: Icon(Icons.fastfood_outlined),
                       ),
                     ),
@@ -210,10 +212,10 @@ class _MenuScreenState extends State<MenuScreen> {
                       controller: priceCtrl,
                       style: const TextStyle(fontSize: 15),
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Harga',
                         prefixText: 'Rp ',
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                         prefixIcon: Icon(Icons.monetization_on_outlined),
                       ),
                     ),
@@ -222,9 +224,9 @@ class _MenuScreenState extends State<MenuScreen> {
                       value: selectedCategoryId.isNotEmpty
                           ? selectedCategoryId
                           : null,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Kategori',
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                         prefixIcon: Icon(Icons.category_outlined),
                       ),
                       items: prov.categories
@@ -239,9 +241,9 @@ class _MenuScreenState extends State<MenuScreen> {
                       controller: descCtrl,
                       maxLines: 3,
                       style: const TextStyle(fontSize: 15),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Deskripsi',
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                         alignLabelWithHint: true,
                         prefixIcon: Padding(
                           padding: EdgeInsets.only(bottom: 48),
@@ -451,6 +453,7 @@ class _MenuScreenState extends State<MenuScreen> {
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text(l10n.delete),
         content: Text(l10n.confirmDelete),
         actions: [
@@ -473,6 +476,7 @@ class _MenuScreenState extends State<MenuScreen> {
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text(l10n.delete),
         content: Text(l10n.confirmDelete),
         actions: [
